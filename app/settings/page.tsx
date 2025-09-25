@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { Container } from "@/components/layout/container";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAppState } from "@/lib/app-state";
+import { GA4_PROPERTIES, COUNTRY_REGION_OPTIONS, DETECTED_PLATFORMS } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
-import { CheckCircle, AlertCircle, Circle } from "lucide-react";
+import { CheckCircle, AlertCircle, Circle, BarChart3, AlertTriangle, Settings } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 interface DataSource {
@@ -20,6 +21,8 @@ interface DataSource {
   populatedStatus?: string;
   editPath: string;
   isPopulated: boolean;
+  canAccess: boolean;
+  dependencyMessage?: string;
 }
 
 interface AttributionConfig {
@@ -30,108 +33,50 @@ interface AttributionConfig {
   populatedStatus?: string;
   editPath: string;
   isPopulated: boolean;
+  canAccess: boolean;
+  dependencyMessage?: string;
   isHub?: boolean;
-  hubItems?: { key: string; label: string; status: string; coverage?: string; description?: string }[];
+  hubItems?: { key: string; label: string; status: string; coverage?: string; healthScore?: number; description?: string }[];
 }
 
 export default function SettingsPage() {
-  const [showIntroOverlay, setShowIntroOverlay] = useState(false);
   const router = useRouter();
   const {
     state: { ga4, accounts, conversion, breakdownHub },
   } = useAppState();
 
   // Check dependencies
-  const ga4Connected = !!ga4.selectedPropertyId;
+  const ga4Connected = ga4.configurations.some(c => c.isConfigured);
   const accountsLinked = accounts.selected.length > 0;
   const conversionSelected = !!conversion.mainGa4Event;
 
-  const dataSources: (DataSource & { canAccess: boolean; dependencyMessage?: string })[] = [
-    {
-      key: "ga4",
-      title: "GA4",
-      description: "Anchor for conversions and revenue",
-      emptyStatus: "Not connected",
-      populatedStatus: ga4Connected ? `Connected: ${ga4.brandLabel || 'GA4 Account'}` : undefined,
-      editPath: "/ga4",
-      isPopulated: ga4Connected,
-      canAccess: true, // Always accessible
-    },
-    {
-      key: "accounts",
-      title: "Ad accounts",
-      description: "Where your spend comes from",
-      emptyStatus: accountsLinked ? "No accounts linked" : "Connect GA4 first",
-      populatedStatus: accountsLinked ? `${accounts.selected.length} account${accounts.selected.length !== 1 ? 's' : ''} linked` : undefined,
-      editPath: "/accounts",
-      isPopulated: accountsLinked,
-      canAccess: ga4Connected,
-      dependencyMessage: ga4Connected ? undefined : "Connect GA4 first",
-    },
-  ];
+  // Mock health data - same as breakdown hub
+  const getBreakdownHealthScore = (type: string): number => {
+    switch (type) {
+      case "channel": return 94;
+      case "market": return 23;
+      case "campaign": return 31;
+      default: return 0;
+    }
+  };
 
-  const attributionConfig: (AttributionConfig & { canAccess: boolean; dependencyMessage?: string })[] = [
-    {
-      key: "conversion",
-      title: "Conversion",
-      description: "The key action you want to optimize for",
-      emptyStatus: conversionSelected ? "Not selected" : "Connect data sources first",
-      populatedStatus: conversionSelected ? `Main event: ${conversion.mainGa4Event}` : undefined,
-      editPath: "/conversion",
-      isPopulated: conversionSelected,
-      canAccess: ga4Connected && accountsLinked,
-      dependencyMessage: (!ga4Connected || !accountsLinked) ? "Connect GA4 and ad accounts first" : undefined,
-    },
-    {
-      key: "breakdowns",
-      title: "Breakdowns",
-      description: "Set up how you want to slice and analyze your attribution data",
-      emptyStatus: (breakdownHub.market.status === "ready" || breakdownHub.campaign.status === "ready" || breakdownHub.channel.status === "ready") ? "Not started" : "Select conversion first",
-      populatedStatus: getBreakdownStatus(breakdownHub),
-      editPath: "/breakdown-hub",
-      isPopulated: breakdownHub.market.status === "ready" || breakdownHub.campaign.status === "ready" || breakdownHub.channel.status === "ready",
-      canAccess: ga4Connected && accountsLinked && conversionSelected,
-      dependencyMessage: (!ga4Connected || !accountsLinked || !conversionSelected) ? "Complete previous steps first" : undefined,
-      isHub: true,
-      hubItems: [
-        { 
-          key: "market", 
-          label: "Market", 
-          status: getStatusLabel(breakdownHub.market.status),
-          coverage: getBreakdownCoverage("market"),
-          description: "Compare performance by country/region"
-        },
-        { 
-          key: "campaign", 
-          label: "Campaign", 
-          status: getStatusLabel(breakdownHub.campaign.status, "campaign"),
-          coverage: getBreakdownCoverage("campaign"),
-          description: "Compare performance by campaign name"
-        },
-        { 
-          key: "channel", 
-          label: "Channel", 
-          status: getStatusLabel(breakdownHub.channel.status, "channel"),
-          coverage: getBreakdownCoverage("channel"),
-          description: "Compare Paid Search, Social, Video, etc."
-        },
-      ],
-    },
-  ];
+  const getHealthStatus = (score: number): "healthy" | "needs_work" => {
+    return score >= 90 ? "healthy" : "needs_work";
+  };
 
-  const allSources = [...dataSources, ...attributionConfig];
-  const anyPopulated = allSources.some(source => source.isPopulated);
-  const allComplete = allSources.every(source => source.isPopulated);
-  const completedCount = allSources.filter(source => source.isPopulated).length;
+  const getBreakdownCoverage = (type: string): string => {
+    const score = getBreakdownHealthScore(type);
+    return `${score}% health`;
+  };
 
   function getBreakdownStatus(hub: any): string | undefined {
     const ready = [];
     if (hub.market.status === "ready") ready.push("Market");
-    if (hub.campaign.status === "ready") ready.push("Campaign"); 
-    if (hub.channel.status === "ready") ready.push("Channel");
-    
+    if (hub.campaign.status === "ready") ready.push("Campaign");
+    if (hub.channel.status === "ready" || hub.channel.status === "auto_mapped") ready.push("Channel");
+
     if (ready.length === 0) return undefined;
-    return ready.join(", ") + " ready";
+    return ready.join(", ") + " active";
   }
 
   function getStatusLabel(status: string, type?: string): string {
@@ -146,48 +91,128 @@ export default function SettingsPage() {
     }
   }
 
-  function getBreakdownCoverage(type: string): string {
-    // Always return 0% for now - will be calculated later based on actual data
-    return "0% coverage";
+  function getDimensionStatusLabel(status: string, type?: string): string {
+    switch (status) {
+      case "ready": return "Active";
+      case "in_progress": return "Configuring";
+      case "auto_mapped": 
+        return type === "channel" ? "Not active" : "Active";
+      case "not_started":
+      default: return "Not active";
+    }
   }
 
-  function getStatusIcon(isPopulated: boolean, canAccess: boolean) {
+  const getStatusIcon = (isPopulated: boolean, canAccess: boolean) => {
     if (isPopulated) return <CheckCircle className="h-4 w-4 text-green-600" />;
     if (canAccess) return <Circle className="h-4 w-4 text-muted-foreground" />;
     return <AlertCircle className="h-4 w-4 text-amber-500" />;
-  }
+  };
+
+  // Get configured GA4 property details
+  const configuredGA4 = ga4.configurations.find(c => c.isConfigured);
+  const ga4Property = configuredGA4 ? GA4_PROPERTIES.find(p => p.id === configuredGA4.propertyId) : null;
+  
+  const dataSources: DataSource[] = [
+    {
+      key: "ga4",
+      title: "GA4 Properties",
+      description: "Data source for conversions and revenue",
+      emptyStatus: "Not connected",
+      populatedStatus: ga4Connected ? `${ga4.configurations.filter(c => c.isConfigured).length} connected` : undefined,
+      editPath: "/ga4",
+      isPopulated: ga4Connected,
+      canAccess: true, // Always accessible
+    },
+    {
+      key: "accounts",
+      title: "Ad Accounts",
+      description: "Sources for advertising spend data",
+      emptyStatus: accountsLinked ? "Not connected" : "Connect GA4 first",
+      populatedStatus: accountsLinked ? `${accounts.selected.length} connected` : undefined,
+      editPath: "/accounts",
+      isPopulated: accountsLinked,
+      canAccess: ga4Connected,
+      dependencyMessage: ga4Connected ? undefined : "Connect GA4 first",
+    },
+  ];
+
+  const attributionConfig: AttributionConfig[] = [
+    {
+      key: "conversion",
+      title: "Main Conversion",
+      description: "Primary event for CPA and ROAS calculations",
+      emptyStatus: conversionSelected ? "Not defined" : "Connect data sources first",
+      populatedStatus: conversionSelected ? `${conversion.mainGa4Event}` : undefined,
+      editPath: "/conversion",
+      isPopulated: conversionSelected,
+      canAccess: ga4Connected && accountsLinked,
+      dependencyMessage: (!ga4Connected || !accountsLinked) ? "Connect GA4 and ad accounts first" : undefined,
+    },
+    {
+      key: "breakdowns",
+      title: "Analysis Dimensions",
+      description: "Active breakdowns for data analysis",
+      emptyStatus: (breakdownHub.market.status === "ready" || breakdownHub.campaign.status === "ready" || breakdownHub.channel.status === "ready") ? "None active" : "Define conversion first",
+      populatedStatus: getBreakdownStatus(breakdownHub),
+      editPath: "/breakdown-hub",
+      isPopulated: breakdownHub.market.status === "ready" || breakdownHub.campaign.status === "ready" || breakdownHub.channel.status === "ready",
+      canAccess: ga4Connected && accountsLinked && conversionSelected,
+      dependencyMessage: (!ga4Connected || !accountsLinked || !conversionSelected) ? "Complete previous steps first" : undefined,
+      isHub: true,
+          hubItems: [
+            { 
+              key: "market", 
+              label: "Market", 
+              status: getDimensionStatusLabel(breakdownHub.market.status),
+              coverage: getBreakdownCoverage("market"),
+              healthScore: getBreakdownHealthScore("market"),
+              description: "Compare performance by country/region"
+            },
+            { 
+              key: "campaign", 
+              label: "Campaign", 
+              status: getDimensionStatusLabel(breakdownHub.campaign.status, "campaign"),
+              coverage: getBreakdownCoverage("campaign"),
+              healthScore: getBreakdownHealthScore("campaign"),
+              description: "Compare performance by campaign name"
+            },
+            { 
+              key: "channel", 
+              label: "Channel", 
+              status: getDimensionStatusLabel(breakdownHub.channel.status, "channel"),
+              coverage: getBreakdownCoverage("channel"),
+              healthScore: getBreakdownHealthScore("channel"),
+              description: "Compare Paid Search, Social, Video, etc."
+            },
+          ],
+    },
+  ];
+
+  const allSources = [...dataSources, ...attributionConfig];
+  const anyPopulated = allSources.some(source => source.isPopulated);
+  const allComplete = allSources.every(source => source.isPopulated);
+  const completedCount = allSources.filter(source => source.isPopulated).length;
 
   const handleStartSetup = () => {
-    if (!anyPopulated) {
-      // First time setup - show intro overlay
-      setShowIntroOverlay(true);
+    // Go to next accessible incomplete step
+    const nextStep = allSources.find(source => !source.isPopulated && source.canAccess);
+    if (nextStep) {
+      router.push(nextStep.editPath);
     } else {
-      // Return visit - go to next accessible incomplete step
-      const nextStep = allSources.find(source => !source.isPopulated && source.canAccess);
-      if (nextStep) {
-        router.push(nextStep.editPath);
-      } else {
-        // All accessible steps complete, go to breakdown hub
-        router.push("/breakdown-hub");
-      }
+      // All accessible steps complete, go to breakdown hub
+      router.push("/breakdown-hub");
     }
   };
 
-  const handleContinueSetup = () => {
-    setShowIntroOverlay(false);
-    router.push("/ga4");
-  };
-
   return (
-    <>
-      <Container className="space-y-8">
+    <Container className="space-y-8">
           <PageHeader
             title="Attribution settings"
-            description="Connect your data sources and configure how you want to analyze performance."
+            description="Manage your data sources, conversion definitions, and analysis dimensions."
           />
 
         <div className="space-y-8">
-          {/* Progress Overview */}
+          {/* Progress Overview Banner */}
           <div className="max-w-4xl mx-auto">
             <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-blue-50/50">
               <CardContent className="py-5 px-8">
@@ -199,12 +224,12 @@ export default function SettingsPage() {
                         : allComplete
                         ? "Setup complete! Your Attribution View is ready"
                         : !ga4Connected
-                        ? "First, connect your GA4 account"
+                        ? "First, connect your GA4 properties"
                         : !accountsLinked
                         ? "Next, link your ad accounts"
                         : !conversionSelected
-                        ? "Then, select your main conversion"
-                        : "Finally, configure your breakdowns"
+                        ? "Then, define your main conversion"
+                        : "Finally, configure your analysis dimensions"
                       }
                     </p>
                     {anyPopulated && !allComplete && (
@@ -226,12 +251,13 @@ export default function SettingsPage() {
             </Card>
           </div>
 
+
           {/* Data Sources Section */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <h2 className="text-xl font-semibold">Connect your data</h2>
+              <h2 className="text-xl font-semibold">Attribution Data Sources</h2>
               <p className="text-muted-foreground">
-                Connect your GA4 and ad accounts so Attribution knows where to pull data.
+                Manage GA4 properties and ad account connections for data collection.
               </p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
@@ -245,7 +271,7 @@ export default function SettingsPage() {
                           {source.title}
                         </CardTitle>
                       </div>
-                      <Badge 
+                      <Badge
                         variant={source.isPopulated ? "default" : source.canAccess ? "outline" : "secondary"}
                         className="text-xs"
                       >
@@ -257,6 +283,62 @@ export default function SettingsPage() {
                     </p>
                   </CardHeader>
                   <CardContent className="pt-0">
+                    {/* Show GA4 property details when connected */}
+                    {source.key === "ga4" && source.isPopulated && configuredGA4 && ga4Property && (
+                      <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                              GA4
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{ga4Property.name}</p>
+                              <p className="text-xs text-muted-foreground">{ga4Property.id}</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <p>Brand: {configuredGA4.brandName}</p>
+                            <p>Market: {COUNTRY_REGION_OPTIONS.find(c => c.value === configuredGA4.countryRegion)?.label}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show linked platforms for Ad Accounts */}
+                    {source.key === "accounts" && source.isPopulated && (
+                      <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Linked Platforms:</p>
+                          <div className="space-y-1">
+                            {DETECTED_PLATFORMS.map((platform) => {
+                              const connection = accounts.platformConnections[platform.id];
+                              const accountCount = connection?.selectedAccounts?.length || 0;
+                              const isConnected = connection?.isConnected && accountCount > 0;
+                              
+                              return (
+                                <div key={platform.id} className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <div className={cn("w-4 h-4 rounded flex items-center justify-center text-white text-xs font-bold", platform.color)}>
+                                      {platform.icon.slice(0, 1)}
+                                    </div>
+                                    <span>{platform.name}</span>
+                                  </div>
+                                  <span className="text-muted-foreground">
+                                    {isConnected 
+                                      ? `${accountCount} accounts` 
+                                      : connection?.linkLater 
+                                      ? "Skipped" 
+                                      : "Not linked"
+                                    }
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex items-center justify-between">
                       {source.dependencyMessage && (
                         <p className="text-xs text-muted-foreground italic">
@@ -266,13 +348,13 @@ export default function SettingsPage() {
                       <div className="ml-auto">
                         {source.canAccess ? (
                           <Link href={source.editPath}>
-                            <Button variant={source.isPopulated ? "ghost" : "default"} size="sm">
-                              {source.isPopulated ? "Edit" : "Set up"}
+                            <Button variant="ghost" size="sm">
+                              {source.isPopulated ? "Manage" : "Connect"}
                             </Button>
                           </Link>
                         ) : (
                           <Button variant="ghost" size="sm" disabled>
-                            {source.isPopulated ? "Edit" : "Set up"}
+                            {source.isPopulated ? "Manage" : "Connect"}
                           </Button>
                         )}
                       </div>
@@ -283,12 +365,12 @@ export default function SettingsPage() {
             </div>
           </div>
 
-              {/* Attribution Config Section */}
+              {/* Conversion Config Section */}
               <div className="space-y-4">
                 <div className="space-y-2 border-t pt-6">
-                  <h2 className="text-xl font-semibold">Configure attribution</h2>
+                  <h2 className="text-xl font-semibold">Conversion Definitions</h2>
                   <p className="text-muted-foreground">
-                    Choose your main conversion and how you want to break results down.
+                    Define your main conversion events and platform mappings.
                   </p>
                 </div>
                 <div className="space-y-4">
@@ -306,7 +388,7 @@ export default function SettingsPage() {
                             variant={config.isPopulated ? "default" : config.canAccess ? "outline" : "secondary"}
                             className="text-xs"
                           >
-                            {config.isPopulated ? (config.populatedStatus || "Ready") : config.emptyStatus}
+                            {config.isPopulated ? (config.populatedStatus || "Configured") : config.emptyStatus}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -323,13 +405,13 @@ export default function SettingsPage() {
                           <div className="ml-auto">
                             {config.canAccess ? (
                               <Link href={config.editPath}>
-                                <Button variant={config.isPopulated ? "ghost" : "default"} size="sm">
-                                  {config.isPopulated ? "Edit" : "Set up"}
+                                <Button variant="ghost" size="sm">
+                                  {config.isPopulated ? "Edit" : "Define"}
                                 </Button>
                               </Link>
                             ) : (
                               <Button variant="ghost" size="sm" disabled>
-                                {config.isPopulated ? "Edit" : "Set up"}
+                                {config.isPopulated ? "Edit" : "Define"}
                               </Button>
                             )}
                           </div>
@@ -340,15 +422,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Configure Breakdowns Section */}
+              {/* Attribution Dimensions Section */}
               {(() => {
                 const breakdownConfig = attributionConfig.find(config => config.isHub);
                 return breakdownConfig ? (
                   <div className="space-y-4">
                     <div className="space-y-2 border-t pt-6">
-                      <h2 className="text-xl font-semibold">Configure breakdowns</h2>
+                      <h2 className="text-xl font-semibold">Attribution Dimensions</h2>
                       <p className="text-muted-foreground">
-                        Set up how you want to slice and analyze your attribution data.
+                        Configure how you want to slice and analyze your attribution data.
                       </p>
                     </div>
                     <Card className="border-2 border-dashed border-muted-foreground/20">
@@ -357,47 +439,100 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-2">
                             {getStatusIcon(breakdownConfig.isPopulated, breakdownConfig.canAccess)}
                             <CardTitle className="text-base font-semibold">
-                              Breakdown setup
+                              Analysis Dimensions
                             </CardTitle>
                           </div>
                           <Badge
                             variant={breakdownConfig.isPopulated ? "default" : breakdownConfig.canAccess ? "outline" : "secondary"}
                             className="text-xs"
                           >
-                            {breakdownConfig.isPopulated ? (breakdownConfig.populatedStatus || "Ready") : breakdownConfig.emptyStatus}
+                            {breakdownConfig.isPopulated ? (breakdownConfig.populatedStatus || "Active") : breakdownConfig.emptyStatus}
                           </Badge>
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
                         {breakdownConfig.hubItems && (
                           <div className="mb-4 space-y-3">
-                            {breakdownConfig.hubItems.map((item) => (
-                              <div key={item.key} className="rounded-lg border bg-muted/30 p-4">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div>
-                                    <span className="text-sm font-semibold">{item.label}</span>
-                                    {item.description && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {item.description}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <Badge variant="outline" className="text-xs">
-                                    {item.status}
-                                  </Badge>
-                                </div>
-                                {item.coverage && (
-                                  <div className="flex items-center gap-2 mt-2">
-                                    <div className="flex-1 bg-muted rounded-full h-2">
-                                      <div className="bg-green-500 h-2 rounded-full w-0"></div>
+                            {breakdownConfig.hubItems.map((item) => {
+                              const healthScore = item.healthScore || 0;
+                              const healthStatus = getHealthStatus(healthScore);
+                              
+                              return (
+                                <div 
+                                  key={item.key} 
+                                  className="rounded-lg border border-gray-200 bg-gray-50/30 p-3"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 flex-1">
+                                      {healthScore > 0 && (
+                                        healthStatus === "healthy" 
+                                          ? <CheckCircle className="h-4 w-4 text-green-600" />
+                                          : <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                      )}
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm font-semibold">{item.label}</span>
+                                          {healthScore > 0 && (
+                                            <>
+                                              <Progress 
+                                                value={healthScore} 
+                                                className={cn(
+                                                  "h-1 w-16",
+                                                  healthStatus === "healthy" 
+                                                    ? "[&>div]:bg-green-600" 
+                                                    : "[&>div]:bg-amber-500"
+                                                )}
+                                              />
+                                              <span className={cn(
+                                                "text-xs font-medium",
+                                                healthStatus === "healthy" ? "text-green-700" : "text-amber-700"
+                                              )}>
+                                                {healthScore}%
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                        {item.description && (
+                                          <p className="text-xs text-muted-foreground mt-0.5">
+                                            {item.description}
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
-                                    <span className="text-xs text-muted-foreground">
-                                      {item.coverage}
-                                    </span>
+                                    <div className="flex items-center gap-2 ml-4">
+                                      <Badge 
+                                        variant="outline"
+                                        className={cn(
+                                          "text-xs",
+                                          healthScore > 0 
+                                            ? (healthStatus === "healthy" 
+                                              ? "border-green-300 text-green-700" 
+                                              : "border-amber-300 text-amber-700")
+                                            : "border-slate-300 text-slate-700"
+                                        )}
+                                      >
+                                        {healthScore > 0 
+                                          ? (healthStatus === "healthy" ? "Ready" : "Poor")
+                                          : item.status
+                                        }
+                                      </Badge>
+                                      {healthScore > 0 && (
+                                        <Link href={`/breakdowns/${item.key}`}>
+                                          <Button 
+                                            size="sm" 
+                                            variant="ghost"
+                                            className="text-slate-600 hover:text-slate-900 hover:bg-slate-100 h-6 px-2 text-xs"
+                                          >
+                                            <Settings className="h-3 w-3 mr-1" />
+                                            {healthStatus === "healthy" ? "Improve" : "Fix"}
+                                          </Button>
+                                        </Link>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                              </div>
-                            ))}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                         <div className="flex items-center justify-between">
@@ -409,13 +544,13 @@ export default function SettingsPage() {
                           <div className="ml-auto">
                             {breakdownConfig.canAccess ? (
                               <Link href={breakdownConfig.editPath}>
-                                <Button variant={breakdownConfig.isPopulated ? "ghost" : "default"} size="sm">
-                                  Configure
+                                <Button variant="ghost" size="sm">
+                                  {breakdownConfig.isPopulated ? "Manage" : "Configure"}
                                 </Button>
                               </Link>
                             ) : (
                               <Button variant="ghost" size="sm" disabled>
-                                Configure
+                                {breakdownConfig.isPopulated ? "Manage" : "Configure"}
                               </Button>
                             )}
                           </div>
@@ -427,53 +562,5 @@ export default function SettingsPage() {
               })()}
         </div>
       </Container>
-
-      {/* Intro Overlay */}
-      <Dialog open={showIntroOverlay} onOpenChange={setShowIntroOverlay}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Before we begin</DialogTitle>
-            <DialogDescription className="text-left">
-              Here's what we'll set up together:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0"></span>
-                <span>Each Attribution View connects to one GA4 for one brand (covering all markets)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0"></span>
-                <span>You'll select the ad accounts you advertise on for this brand</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0"></span>
-                <span>You'll pick a main conversion</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="w-1 h-1 rounded-full bg-muted-foreground mt-2 flex-shrink-0"></span>
-                <span>You'll set up your breakdowns (Market first, Campaign/Channel optional)</span>
-              </li>
-            </ul>
-            
-            <div className="rounded-lg border border-muted bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground">
-                If your setup spans multiple GA4s across brands or markets, attribution requires extra configuration. Contact us and we'll help.
-              </p>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button onClick={handleContinueSetup} className="flex-1">
-                Continue setup
-              </Button>
-              <Button variant="outline" onClick={() => setShowIntroOverlay(false)} className="flex-1">
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+    );
 }

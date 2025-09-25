@@ -23,13 +23,30 @@ export interface Rule {
 
 export type BreakdownStatus = "not_started" | "in_progress" | "ready" | "auto_mapped";
 
+export interface GA4PropertyConfiguration {
+  propertyId: string;
+  brandName?: string;
+  countryRegion?: string;
+  isConfigured: boolean;
+}
+
 export interface AppState {
   ga4: {
-    selectedPropertyId?: string;
-    brandLabel?: string;
-    coversAllMarketsConfirmed?: boolean;
+    configurations: GA4PropertyConfiguration[];
+    selectedPropertyId?: string; // Currently selected for configuration
   };
   accounts: {
+    platformConnections: Record<string, {
+      isConnected: boolean;
+      isAuthenticated: boolean;
+      linkLater?: boolean;
+      selectedAccounts: {
+        id: string;
+        name: string;
+        accountId: string;
+      }[];
+    }>;
+    // Legacy field for backward compatibility
     selected: {
       id: string;
       name: string;
@@ -76,11 +93,11 @@ export interface AppState {
 function createInitialState(): AppState {
   return {
     ga4: {
+      configurations: [],
       selectedPropertyId: undefined,
-      brandLabel: undefined,
-      coversAllMarketsConfirmed: undefined,
     },
     accounts: {
+      platformConnections: {},
       selected: [],
     },
     conversion: {
@@ -126,7 +143,9 @@ interface AppStateContextValue {
   actions: {
     reset: () => void;
     updateGa4: (partial: Partial<AppState["ga4"]>) => void;
+    updateGa4Property: (propertyId: string, config: Partial<GA4PropertyConfiguration>) => void;
     updateAccounts: (selected: AppState["accounts"]["selected"]) => void;
+    updatePlatformConnection: (platformId: string, connection: Partial<AppState["accounts"]["platformConnections"][string]>) => void;
     updateConversion: (partial: Partial<AppState["conversion"]>) => void;
     updateBreakdownHub: (partial: Partial<AppState["breakdownHub"]>) => void;
     updateBreakdowns: (
@@ -152,11 +171,62 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ...prev,
         ga4: { ...prev.ga4, ...partial },
       })),
-    updateAccounts: (selected: AppState["accounts"]["selected"]) =>
-      setState((prev) => ({
-        ...prev,
-        accounts: { ...prev.accounts, selected },
-      })),
+    updateGa4Property: (propertyId: string, config: Partial<GA4PropertyConfiguration>) =>
+      setState((prev) => {
+        const configurations = [...prev.ga4.configurations];
+        const existingIndex = configurations.findIndex(c => c.propertyId === propertyId);
+        
+        if (existingIndex >= 0) {
+          // Update existing configuration
+          const updatedConfig = {
+            ...configurations[existingIndex],
+            ...config,
+          };
+          updatedConfig.isConfigured = !!(updatedConfig.brandName && updatedConfig.countryRegion);
+          configurations[existingIndex] = updatedConfig;
+        } else {
+          // Create new configuration
+          configurations.push({
+            propertyId,
+            brandName: config.brandName,
+            countryRegion: config.countryRegion,
+            isConfigured: !!(config.brandName && config.countryRegion)
+          });
+        }
+        
+        return {
+          ...prev,
+          ga4: {
+            ...prev.ga4,
+            configurations
+          }
+        };
+      }),
+        updateAccounts: (selected: AppState["accounts"]["selected"]) =>
+          setState((prev) => ({
+            ...prev,
+            accounts: { ...prev.accounts, selected },
+          })),
+        updatePlatformConnection: (platformId: string, connection: Partial<AppState["accounts"]["platformConnections"][string]>) =>
+          setState((prev) => ({
+            ...prev,
+            accounts: {
+              ...prev.accounts,
+              platformConnections: {
+                ...prev.accounts.platformConnections,
+                [platformId]: {
+                  ...{
+                    isConnected: false,
+                    isAuthenticated: false,
+                    linkLater: false,
+                    selectedAccounts: [],
+                  },
+                  ...prev.accounts.platformConnections[platformId],
+                  ...connection,
+                }
+              }
+            },
+          })),
     updateConversion: (partial: Partial<AppState["conversion"]>) =>
       setState((prev) => ({
         ...prev,

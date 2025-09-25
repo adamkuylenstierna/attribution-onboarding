@@ -93,9 +93,11 @@ export default function DashboardPreviewPage() {
     },
   } = useAppState();
 
-  const ga4Property = GA4_PROPERTIES.find(
-    (property) => property.id === ga4.selectedPropertyId
-  );
+  // Get the first configured GA4 property as the primary one for display
+  const primaryGA4Config = ga4.configurations.find(c => c.isConfigured);
+  const ga4Property = primaryGA4Config ? 
+    GA4_PROPERTIES.find(p => p.id === primaryGA4Config.propertyId) : 
+    undefined;
 
   const availableBreakdowns: BreakdownKey[] = useMemo(() => {
     const base: BreakdownKey[] = [];
@@ -131,7 +133,7 @@ export default function DashboardPreviewPage() {
   return (
     <Container className="space-y-8">
       <PageHeader
-        title={ga4.brandLabel ?? "Attribution view"}
+        title={primaryGA4Config?.brandName ?? "Attribution view"}
         description={
           ga4Property
             ? `${ga4Property.name} · ${ga4Property.id}`

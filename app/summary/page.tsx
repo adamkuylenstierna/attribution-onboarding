@@ -26,9 +26,11 @@ export default function SummaryPage() {
     },
   } = useAppState();
 
-  const ga4Property = GA4_PROPERTIES.find(
-    (property) => property.id === ga4.selectedPropertyId
-  );
+  // Get the first configured GA4 property as the primary one for display
+  const primaryGA4Config = ga4.configurations.find(c => c.isConfigured);
+  const ga4Property = primaryGA4Config ? 
+    GA4_PROPERTIES.find(p => p.id === primaryGA4Config.propertyId) : 
+    undefined;
 
   const activeBreakdowns: BreakdownKey[] = [];
   if (breakdownHub.market.status === "ready") activeBreakdowns.push("market");
@@ -52,7 +54,7 @@ export default function SummaryPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-md border p-4">
               <p className="text-sm text-muted-foreground">Brand</p>
-              <p className="text-lg font-semibold">{ga4.brandLabel ?? "Brand"}</p>
+              <p className="text-lg font-semibold">{primaryGA4Config?.brandName ?? "Brand"}</p>
             </div>
             <div className="rounded-md border p-4">
               <p className="text-sm text-muted-foreground">GA4 property</p>

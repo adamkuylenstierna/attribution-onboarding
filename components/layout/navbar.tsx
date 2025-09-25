@@ -15,17 +15,6 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3">
-        <Link href="/" className="flex items-center gap-2 text-sm">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-            AV
-          </span>
-          <div className="leading-none">
-            <span className="font-semibold">Attribution View</span>
-            <span className="block text-[11px] text-muted-foreground">
-              Onboarding prototype
-            </span>
-          </div>
-        </Link>
         <div className={cn("hidden flex-1 justify-center lg:flex")}> 
           <Stepper key={pathname} />
         </div>

@@ -16,25 +16,25 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     key: "ga4",
     path: "/ga4",
-    label: "Connect GA4",
+    label: "Configure GA4 Property",
     description: "Connect data source",
   },
   {
     key: "accounts",
     path: "/accounts",
-    label: "Connect ad accounts",
+    label: "Link ad platforms",
     description: "Select platforms",
   },
   {
     key: "conversion",
     path: "/conversion",
-    label: "Pick conversion",
+    label: "Select main conversion",
     description: "Main KPI event",
   },
   {
     key: "breakdowns",
     path: "/breakdown-hub",
-    label: "Confirm Breakdowns",
+    label: "Breakdown Health Analysis",
     description: "Set up results view",
   },
 ];
