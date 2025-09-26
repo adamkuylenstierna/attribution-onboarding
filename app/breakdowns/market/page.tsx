@@ -669,7 +669,7 @@ export default function MarketBreakdownPage() {
         </Card>
       ) : null}
 
-      <StepFooter nextHref="/coverage" nextLabel="Check coverage" />
+      <StepFooter nextHref="/summary" nextLabel="Continue" />
     </Container>
   );
 }

@@ -137,11 +137,11 @@ export default function CampaignBreakdownPage() {
         </CardContent>
       </Card>
       <StepFooter
-        nextHref="/coverage"
-        nextLabel="Check coverage"
+        nextHref="/summary"
+        nextLabel="Continue"
         secondaryAction={
-          <Button variant="ghost" onClick={() => router.push("/coverage")}>
-            I’ll do this later
+          <Button variant="ghost" onClick={() => router.push("/summary")}>
+            Skip for now
           </Button>
         }
       />

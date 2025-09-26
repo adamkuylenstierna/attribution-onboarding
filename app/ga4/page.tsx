@@ -196,20 +196,6 @@ export default function Ga4Page() {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm">{property.name}</p>
                         <p className="text-xs text-muted-foreground">{property.id}</p>
-                        {config && (
-                          <div className="mt-2 space-y-1">
-                            {config.brandName && (
-                              <p className="text-xs text-muted-foreground">
-                                Brand: {config.brandName}
-                              </p>
-                            )}
-                            {config.countryRegion && (
-                              <p className="text-xs text-muted-foreground">
-                                Market: {COUNTRY_REGION_OPTIONS.find(c => c.value === config.countryRegion)?.label}
-                              </p>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>

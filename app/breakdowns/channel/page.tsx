@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/layout/container";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,189 +13,241 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Trash2 } from "lucide-react";
 import { useAppState, PlatformKey } from "@/lib/app-state";
 
-const DEFAULT_CHANNEL: Record<PlatformKey, string> = {
-  google_ads: "Paid Search",
-  meta: "Paid Social",
-  tiktok: "Paid Social",
-  linkedin: "Paid Social",
-};
+// Mock UTM mapping data
+interface UTMMapping {
+  id: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  channelGroup: string;
+  channel: string;
+}
 
-const CHANNEL_OPTIONS = [
-  "Paid Search",
-  "Paid Social",
-  "Video",
-  "Display",
-  "Affiliate",
-  "Other",
+const MOCK_UTM_MAPPINGS: UTMMapping[] = [
+  {
+    id: "1",
+    utmSource: "Trustpilot",
+    utmMedium: "",
+    utmCampaign: "",
+    channelGroup: "Referral",
+    channel: "Trustpilot"
+  },
+  {
+    id: "2", 
+    utmSource: "Yandex",
+    utmMedium: "CPC",
+    utmCampaign: "",
+    channelGroup: "Search paid",
+    channel: "Yandex"
+  },
+  {
+    id: "3",
+    utmSource: "Pricerunner",
+    utmMedium: "CPC", 
+    utmCampaign: "",
+    channelGroup: "Price comparison",
+    channel: "Pricerunner"
+  },
+  {
+    id: "4",
+    utmSource: "Klarna",
+    utmMedium: "Referral",
+    utmCampaign: "",
+    channelGroup: "Referral", 
+    channel: "Klarna"
+  },
+  {
+    id: "5",
+    utmSource: "Wordseed",
+    utmMedium: "CPC",
+    utmCampaign: "",
+    channelGroup: "Affiliate",
+    channel: "Wordseed"
+  },
+  {
+    id: "6",
+    utmSource: "Customer newsletter",
+    utmMedium: "Email",
+    utmCampaign: "",
+    channelGroup: "CRM",
+    channel: "Newsletter"
+  },
+  {
+    id: "7",
+    utmSource: "Rule",
+    utmMedium: "Email", 
+    utmCampaign: "",
+    channelGroup: "CRM",
+    channel: "Transaction"
+  }
 ];
 
-function calculateChannelCoverage(
-  overrides: Record<string, string>,
-  platforms: PlatformKey[]
-) {
-  const base = 92;
-  const uniqueOverrides = Object.entries(overrides)
-    .filter(([platform]) => platforms.includes(platform as PlatformKey))
-    .map(([, value]) => value.toLowerCase());
-  const adjustments = Math.max(0, new Set(uniqueOverrides).size - platforms.length);
-  return Math.max(85, base - adjustments * 3);
-}
+const CHANNEL_GROUPS = [
+  "Referral",
+  "Search paid", 
+  "Price comparison",
+  "Affiliate",
+  "CRM",
+  "Display",
+  "Social paid",
+  "Other"
+];
+
+const CHANNELS = [
+  "Trustpilot",
+  "Yandex", 
+  "Pricerunner",
+  "Klarna",
+  "Wordseed",
+  "Newsletter",
+  "Transaction",
+  "Facebook",
+  "Google",
+  "Other"
+];
 
 export default function ChannelBreakdownPage() {
   const router = useRouter();
-  const {
-    state: {
-      accounts: { selected: linkedAccounts },
-      breakdowns: { channel },
-    },
-    actions,
-  } = useAppState();
+  const [mappings, setMappings] = useState<UTMMapping[]>(MOCK_UTM_MAPPINGS);
+  const [selectedBrand, setSelectedBrand] = useState("Diesel.com");
 
-  const platformsInUse = Array.from(
-    new Set(linkedAccounts.map((account) => account.platform))
-  ) as PlatformKey[];
+  const updateMapping = (id: string, field: keyof UTMMapping, value: string) => {
+    setMappings(prev => prev.map(mapping => 
+      mapping.id === id ? { ...mapping, [field]: value } : mapping
+    ));
+  };
 
-  const overrides = channel.overrides;
-  const coverage = useMemo(
-    () => calculateChannelCoverage(overrides, platformsInUse),
-    [overrides, platformsInUse]
-  );
-
-  useEffect(() => {
-    if (channel.coverageScore !== coverage) {
-      actions.updateBreakdowns({
-        channel: {
-          overrides,
-          coverageScore: coverage,
-        },
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coverage, overrides, channel.coverageScore]);
-
-  const handleOverride = (platform: PlatformKey, value: string) => {
-    const nextOverrides = {
-      ...overrides,
-      [platform]: value,
-    } as Record<PlatformKey, string>;
-    const nextCoverage = calculateChannelCoverage(nextOverrides, platformsInUse);
-    actions.updateBreakdowns({
-      channel: {
-        overrides: nextOverrides,
-        coverageScore: nextCoverage,
-      },
-    });
+  const deleteMapping = (id: string) => {
+    setMappings(prev => prev.filter(mapping => mapping.id !== id));
   };
 
   return (
-    <Container className="space-y-8">
-      <PageHeader
-        title="Channel mapping"
-        description="We automatically detect channels for most platforms. Adjust any edge cases here."
-      />
-      <Card>
-        <CardHeader>
-          <CardTitle>Default mapping</CardTitle>
-          <CardDescription>
-            Review the defaults and override only when a platform serves multiple buying motions.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Platform</TableHead>
-                <TableHead>Current channel</TableHead>
-                <TableHead className="text-right">Override</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {platformsInUse.map((platform) => (
-                <TableRow key={platform}>
-                  <TableCell className="font-medium capitalize">
-                    {platform.replace("_", " ")}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">
-                      {overrides[platform] ?? DEFAULT_CHANNEL[platform]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Select
-                      value={overrides[platform] ?? DEFAULT_CHANNEL[platform]}
-                      onValueChange={(value) =>
-                        handleOverride(platform, value)
-                      }
+    <Container className="space-y-6">
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="Mapping"
+          description="Manage how your web site traffic should be assigned to different channel groups and channels based on UTM parameters"
+        />
+        <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Diesel.com">Diesel.com</SelectItem>
+            <SelectItem value="Other.com">Other.com</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Tabs defaultValue="unmapped" className="w-full">
+        <TabsList className="grid w-fit grid-cols-2">
+          <TabsTrigger value="unmapped">Unmapped traffic</TabsTrigger>
+          <TabsTrigger value="existing">Existing mappings</TabsTrigger>
+        </TabsList>
+
+        <div className="mt-4">
+          <p className="text-sm text-muted-foreground mb-6">
+            Note that created mappings will only be applied to future visits and not to past visits before the mapping was created.
+          </p>
+
+          <TabsContent value="unmapped" className="mt-0">
+            <div className="space-y-4">
+              <div className="grid grid-cols-6 gap-4 text-sm font-medium text-muted-foreground">
+                <div>UTM source</div>
+                <div>UTM medium</div>
+                <div>UTM campaign</div>
+                <div>Channel group</div>
+                <div>Channel</div>
+                <div></div>
+              </div>
+
+              {mappings.map((mapping) => (
+                <div key={mapping.id} className="grid grid-cols-6 gap-4 items-center">
+                  <div className="bg-muted rounded px-3 py-2 text-sm">
+                    {mapping.utmSource}
+                  </div>
+                  <div className="bg-muted rounded px-3 py-2 text-sm">
+                    {mapping.utmMedium}
+                  </div>
+                  <div className="bg-muted rounded px-3 py-2 text-sm">
+                    {mapping.utmCampaign}
+                  </div>
+                  <div className="flex items-center">
+                    <span className="mr-2">→</span>
+                    <Select 
+                      value={mapping.channelGroup} 
+                      onValueChange={(value) => updateMapping(mapping.id, 'channelGroup', value)}
                     >
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="bg-blue-100 border-blue-200">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CHANNEL_OPTIONS.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
+                        {CHANNEL_GROUPS.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </TableCell>
-                </TableRow>
+                  </div>
+                  <div>
+                    <Select 
+                      value={mapping.channel} 
+                      onValueChange={(value) => updateMapping(mapping.id, 'channel', value)}
+                    >
+                      <SelectTrigger className="bg-blue-100 border-blue-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CHANNELS.map((channel) => (
+                          <SelectItem key={channel} value={channel}>
+                            {channel}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => deleteMapping(mapping.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
-          {platformsInUse.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No platforms connected yet. Add accounts earlier in the flow to configure channel mapping.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Coverage</CardTitle>
-          <CardDescription>
-            Mocked share of spend automatically attributed to a channel.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Mapped</p>
-              <p className="text-2xl font-semibold">{coverage}%</p>
             </div>
-            <div className="w-full max-w-xs">
-              <Progress value={coverage} />
+          </TabsContent>
+
+          <TabsContent value="existing" className="mt-0">
+            <div className="text-center py-8 text-muted-foreground">
+              <p>No existing mappings configured yet.</p>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Most coverage comes from defaults. Overrides help tidy edge cases without dropping trust in the numbers.
-          </p>
-        </CardContent>
-      </Card>
+          </TabsContent>
+        </div>
+      </Tabs>
+
       <StepFooter
-        nextHref="/coverage"
-        nextLabel="Check coverage"
+        nextHref="/summary"
+        nextLabel="Save mappings"
         secondaryAction={
-          <Button variant="ghost" onClick={() => router.push("/coverage")}>I’ll do this later</Button>
+          <Button variant="ghost" onClick={() => router.push("/summary")}>
+            Skip for now
+          </Button>
         }
       />
     </Container>
