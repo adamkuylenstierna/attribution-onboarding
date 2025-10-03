@@ -14,9 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAppState } from "@/lib/app-state";
 import { GA4_PROPERTIES, COUNTRY_REGION_OPTIONS, DETECTED_PLATFORMS, PLATFORM_AD_ACCOUNTS, GA4_EVENT_OPTIONS, PLATFORM_CONVERSION_EVENTS } from "@/lib/mock-data";
-import { Settings, TrendingUp, TrendingDown, Calendar, ChevronRight, ExternalLink, AlertCircle, CheckCircle } from "lucide-react";
+import { Settings, TrendingUp, TrendingDown, Calendar, ChevronRight, ExternalLink, AlertCircle, CheckCircle, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -370,14 +371,26 @@ export default function DashboardPage() {
           </div>
 
           <div className="px-6 py-4 space-y-6">
-            {/* GA4 Property & Market - Merged */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">GA4 Property & Market</h3>
+            <TooltipProvider>
+              {/* GA4 Property & Market - Merged */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">GA4 Property & Market</h3>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>The GA4 property provides conversion and revenue data. Market indicates which geographic region or country this property represents.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <p className="text-xs text-muted-foreground">Source for conversion and revenue tracking</p>
               {configuredGA4 && ga4Property ? (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm">
-                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
-                      GA4
+                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-green-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                      GA
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{configuredGA4.brandName}</p>
@@ -398,7 +411,18 @@ export default function DashboardPage() {
 
             {/* Ad Platform Accounts - List view with manage button */}
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Ad Platform Accounts</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Ad Platform Accounts</h3>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Ad accounts from platforms like Google Ads, Meta, and TikTok provide spend data that's matched with GA4 conversions to calculate CPA and ROAS.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <p className="text-xs text-muted-foreground">Sources for advertising spend data</p>
               
               <div className="space-y-2">
                 {/* Connected platforms */}
@@ -472,15 +496,23 @@ export default function DashboardPage() {
 
             {/* GA Main Conversion - Compact */}
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">GA Main Conversion</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">GA Main Conversion</h3>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>The primary event tracked in GA4 (e.g., Purchase) used to measure success and calculate attribution metrics across all platforms.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <p className="text-xs text-muted-foreground">Primary event for CPA and ROAS calculations</p>
               {conversion.mainGa4Event ? (
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium capitalize">{conversion.mainGa4Event}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {GA4_EVENT_OPTIONS.find(e => e.value === conversion.mainGa4Event)?.label}
-                    </p>
-                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {GA4_EVENT_OPTIONS.find(e => e.value === conversion.mainGa4Event)?.label || conversion.mainGa4Event}
+                  </Badge>
                   <Link href="/conversion">
                     <Button variant="ghost" size="sm" className="h-6 text-xs px-2">
                       Change
@@ -494,7 +526,18 @@ export default function DashboardPage() {
 
             {/* Platform Main Conversions - List view */}
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Platform Conversion Mappings</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Platform Conversion Mappings</h3>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Each ad platform uses different names for conversion events. Map each platform's conversion event to your GA4 main conversion to ensure accurate tracking.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <p className="text-xs text-muted-foreground">Link platform events to your GA4 conversion</p>
               
               {connectedPlatforms.length > 0 ? (
                 <div className="space-y-2">
@@ -510,11 +553,17 @@ export default function DashboardPage() {
                           <div className={cn("w-5 h-5 rounded flex items-center justify-center text-white text-[10px] font-bold", platform.color)}>
                             {platform.icon.slice(0, 1)}
                           </div>
-                          <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
                             <p className="text-sm font-medium">{platform.name}</p>
-                            <p className={cn("text-xs truncate", isMapped ? "text-muted-foreground" : "text-amber-600")}>
-                              {isMapped ? eventLabel : "Not mapped yet"}
-                            </p>
+                            {isMapped ? (
+                              <Badge variant="secondary" className="text-xs">
+                                {eventLabel}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                                Not mapped yet
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <Link href="/conversion">
@@ -555,6 +604,7 @@ export default function DashboardPage() {
                 <p className="text-sm text-muted-foreground">No platforms connected</p>
               )}
             </div>
+          </TooltipProvider>
           </div>
 
           {/* Footer with full setup link */}
